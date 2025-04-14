@@ -9,8 +9,8 @@ servers:
 paths:
   /query:
     post:
-      summary: Query points
-      description: Universally query points. This endpoint covers all capabilities of search, recommend, discover, filters. But also enables hybrid and multi-stage queries.
+      summary: Query points with OpenAI embedding
+      description: Generate embeddings using OpenAI API and query points in Qdrant database.
       operationId: queryPoints
       requestBody:
         description: Query configuration
@@ -20,83 +20,31 @@ paths:
             schema:
               type: object
               properties:
-                query:
-                  oneOf:
-                    - type: array
-                      items:
-                        type: number
-                        format: double
-                    - type: array
-                      items:
-                        type: array
-                        items:
-                          type: number
-                          format: double
-                    - type: string
-                    - type: integer
-                    - type: object
-                      properties:
-                        recommend:
-                          type: object
-                          properties:
-                            positive:
-                              type: array
-                              items:
-                                oneOf:
-                                  - type: string
-                                  - type: array
-                                    items:
-                                      type: number
-                                      format: double
-                            negative:
-                              type: array
-                              items:
-                                oneOf:
-                                  - type: string
-                                  - type: array
-                                    items:
-                                      type: number
-                                      format: double
-                        fusion:
-                          type: string
-                        sample:
-                          type: string
+                input:
+                  type: string
+                  description: Text input to generate embedding.
+                model:
+                  type: string
+                  description: OpenAI embedding model to use.
+                  default: text-embedding-3-small
+                limit:
+                  type: integer
+                  description: Max number of points to return.
+                  default: 10
+                with_payload:
+                  type: boolean
+                  description: Whether to include payload in the response.
+                  default: true
+                offset:
+                  type: integer
+                  description: Offset of the result. Skip this many points.
+                  default: 0
                 filter:
                   type: object
                   description: Filter conditions - return only those points that satisfy the specified conditions.
                 params:
                   type: object
-                  description: Search params for when there is no prefetch
-                score_threshold:
-                  type: number
-                  format: double
-                  description: Return points with scores better than this threshold.
-                limit:
-                  type: integer
-                  minimum: 1
-                  description: Max number of points to return. Default is 10.
-                offset:
-                  type: integer
-                  minimum: 0
-                  description: Offset of the result. Skip this many points. Default is 0
-                with_vector:
-                  oneOf:
-                    - type: boolean
-                    - type: array
-                      items:
-                        type: string
-                  description: Options for specifying which vectors to include into the response. Default is false.
-                with_payload:
-                  oneOf:
-                    - type: boolean
-                    - type: array
-                      items:
-                        type: string
-                    - type: object
-                  description: Options for specifying which payload to include or not. Default is false.
-                lookup_from:
-                  type: object
-                  description: The location to use for IDs lookup, if not specified - use the current collection and the 'using' vector.
+                  description: Search params for when there is no prefetch.
       responses:
         '200':
           description: Successful operation
@@ -105,21 +53,6 @@ paths:
               schema:
                 type: object
                 properties:
-                  usage:
-                    type: object
-                    properties:
-                      cpu:
-                        type: integer
-                      io_read:
-                        type: integer
-                      io_write:
-                        type: integer
-                  time:
-                    type: number
-                    format: double
-                    description: Time spent to process this request
-                  status:
-                    type: string
                   result:
                     type: object
                     properties:
@@ -140,12 +73,18 @@ paths:
                             payload:
                               type: object
                               additionalProperties: true
-                            vector:
-                              type: array
-                              items:
-                                type: number
-                                format: double
-                            shard_key:
-                              type: string
-                            order_value:
-                              type: integer
+                  usage:
+                    type: object
+                    properties:
+                      cpu:
+                        type: integer
+                      io_read:
+                        type: integer
+                      io_write:
+                        type: integer
+                  time:
+                    type: number
+                    format: double
+                    description: Time spent to process this request
+                  status:
+                    type: string

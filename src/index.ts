@@ -52,7 +52,7 @@ app.post('/query', async (c) => {
         'Content-Type': 'application/json',
         'api-key': qdrantApiKey,
       },
-      body: JSON.stringify({ ...qdrantParams, query: embedding }),
+      body: JSON.stringify({ ...qdrantParams, query: embedding, with_payload: true }),
     });
 
     if (!qdrantResponse.ok) {

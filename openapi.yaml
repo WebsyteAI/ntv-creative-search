@@ -1,0 +1,151 @@
+openapi: 3.1.0
+info:
+  title: Qdrant Vector Database API Wrapper
+  description: Wrapper API for Qdrant vector database query operations
+  version: 1.0.0
+servers:
+  - url: https://ntv-creative-search-pv.websyte.ai
+    description: Wrapper API server
+paths:
+  /query:
+    post:
+      summary: Query points
+      description: Universally query points. This endpoint covers all capabilities of search, recommend, discover, filters. But also enables hybrid and multi-stage queries.
+      operationId: queryPoints
+      requestBody:
+        description: Query configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  oneOf:
+                    - type: array
+                      items:
+                        type: number
+                        format: double
+                    - type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                          format: double
+                    - type: string
+                    - type: integer
+                    - type: object
+                      properties:
+                        recommend:
+                          type: object
+                          properties:
+                            positive:
+                              type: array
+                              items:
+                                oneOf:
+                                  - type: string
+                                  - type: array
+                                    items:
+                                      type: number
+                                      format: double
+                            negative:
+                              type: array
+                              items:
+                                oneOf:
+                                  - type: string
+                                  - type: array
+                                    items:
+                                      type: number
+                                      format: double
+                        fusion:
+                          type: string
+                        sample:
+                          type: string
+                filter:
+                  type: object
+                  description: Filter conditions - return only those points that satisfy the specified conditions.
+                params:
+                  type: object
+                  description: Search params for when there is no prefetch
+                score_threshold:
+                  type: number
+                  format: double
+                  description: Return points with scores better than this threshold.
+                limit:
+                  type: integer
+                  minimum: 1
+                  description: Max number of points to return. Default is 10.
+                offset:
+                  type: integer
+                  minimum: 0
+                  description: Offset of the result. Skip this many points. Default is 0
+                with_vector:
+                  oneOf:
+                    - type: boolean
+                    - type: array
+                      items:
+                        type: string
+                  description: Options for specifying which vectors to include into the response. Default is false.
+                with_payload:
+                  oneOf:
+                    - type: boolean
+                    - type: array
+                      items:
+                        type: string
+                    - type: object
+                  description: Options for specifying which payload to include or not. Default is false.
+                lookup_from:
+                  type: object
+                  description: The location to use for IDs lookup, if not specified - use the current collection and the 'using' vector.
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usage:
+                    type: object
+                    properties:
+                      cpu:
+                        type: integer
+                      io_read:
+                        type: integer
+                      io_write:
+                        type: integer
+                  time:
+                    type: number
+                    format: double
+                    description: Time spent to process this request
+                  status:
+                    type: string
+                  result:
+                    type: object
+                    properties:
+                      points:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              oneOf:
+                                - type: integer
+                                - type: string
+                            version:
+                              type: integer
+                            score:
+                              type: number
+                              format: double
+                            payload:
+                              type: object
+                              additionalProperties: true
+                            vector:
+                              type: array
+                              items:
+                                type: number
+                                format: double
+                            shard_key:
+                              type: string
+                            order_value:
+                              type: integer

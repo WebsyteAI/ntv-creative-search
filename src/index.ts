@@ -16,7 +16,7 @@ app.post('/query', async (c) => {
 
   try {
     // Extract input text and other parameters from the request body
-    const { input, model = 'text-embedding-3-small', ...qdrantParams } = await c.req.json();
+    const { input, model = 'text-embedding-3-small', with_payload = true, ...qdrantParams } = await c.req.json();
 
     if (!input) {
       return c.json({ error: 'Input text is required for embedding generation' }, 400);
@@ -52,7 +52,7 @@ app.post('/query', async (c) => {
         'Content-Type': 'application/json',
         'api-key': qdrantApiKey,
       },
-      body: JSON.stringify({ ...qdrantParams, query: embedding, with_payload: true }),
+      body: JSON.stringify({ ...qdrantParams, query: embedding, with_payload }),
     });
 
     if (!qdrantResponse.ok) {

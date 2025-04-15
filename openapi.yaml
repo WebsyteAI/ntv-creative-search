@@ -10,7 +10,7 @@ paths:
   /query:
     post:
       summary: Query points with OpenAI embedding
-      description: Generate embeddings using OpenAI API and query points in Qdrant database.
+      description: Generate embeddings using OpenAI API and query points in Qdrant database. Headlines and valid CTA URLs are extracted from each adContext and included in the payload.
       operationId: queryPoints
       requestBody:
         description: Query configuration
@@ -72,7 +72,31 @@ paths:
                               format: double
                             payload:
                               type: object
-                              additionalProperties: true
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                type:
+                                  type: string
+                                created:
+                                  type: string
+                                  format: date-time
+                                advertiser:
+                                  type: string
+                                adContext:
+                                  type: string
+                                headlines:
+                                  type: array
+                                  items:
+                                    type: string
+                                  description: Extracted headlines from the ad context
+                                ctaUrls:
+                                  type: array
+                                  items:
+                                    type: string
+                                    format: uri
+                                  description: Valid CTA URLs extracted from the ad context (real URLs only, no placeholders)
                   usage:
                     type: object
                     properties:

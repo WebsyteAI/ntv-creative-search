@@ -11,9 +11,41 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS
 app.use('*', cors());
 
+// Helper: Use OpenAI to summarize/shorten the input for Qdrant queries
+async function condenseInputWithAI(input: string, openaiApiKey: string): Promise<string> {
+  const systemPrompt = `You are an expert at search query optimization. Given a long or verbose user message, rewrite it as a short, focused search query that will work well for semantic search in a vector database. Remove unnecessary details, keep it concise, and focus on the main topic or intent.`;
+  const userPrompt = `Original message:\n${input}\n\nRewrite as a short, focused search query:`;
+
+  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini-2025-04-14',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0,
+      max_tokens: 32,
+      response_format: { type: 'text' }
+    })
+  });
+
+  if (!openaiResponse.ok) {
+    console.error('OpenAI input condense error:', await openaiResponse.text());
+    return input;
+  }
+  const data = await openaiResponse.json();
+  const condensed = data.choices?.[0]?.message?.content?.trim();
+  return condensed && condensed.length > 0 ? condensed : input;
+}
+
 // Helper: Use OpenAI to extract a headline, CTA URL, images, and summary from adContext
 async function extractAdDataWithAI(adContext: string, openaiApiKey: string): Promise<{ headline: string | null; ctaUrl: string | null; images: string[]; summary: string | null }> {
-  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\n- images: An array of all image URLs (src attributes) that are valid https?:// URLs.\n- summary: A concise, informational summary (1-2 sentences) of the content, in plain English. Do not mention that it is an ad or advertisement; just summarize the information presented.\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null, "images": string[], "summary": string | null }.`;
+  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL). If there are no valid URLs, use the placeholder PRX_CLICK_URL.\n- images: An array of all image URLs (src attributes) that are valid https?:// URLs.\n- summary: A concise, informational summary (1-2 sentences) of the content, in plain English. Do not mention that it is an ad or advertisement; just summarize the information presented.\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null, "images": string[], "summary": string | null }.`;
 
   const userPrompt = `Ad context:\n\n${adContext}\n\nExtract headline, ctaUrl, images, and summary as described.`;
 
@@ -70,6 +102,9 @@ app.post('/query', async (c) => {
       return c.json({ error: 'Input text is required for embedding generation' }, 400);
     }
 
+    // Step 0: Condense input for Qdrant query
+    const condensedInput = await condenseInputWithAI(input, openaiApiKey);
+
     // Step 1: Generate embedding using OpenAI API
     const openaiEmbeddingResponse = await fetch(openaiUrl, {
       method: 'POST',
@@ -77,7 +112,7 @@ app.post('/query', async (c) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiApiKey}`,
       },
-      body: JSON.stringify({ input, model }),
+      body: JSON.stringify({ input: condensedInput, model }),
     });
 
     if (!openaiEmbeddingResponse.ok) {

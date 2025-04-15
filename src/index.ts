@@ -13,7 +13,7 @@ app.use('*', cors());
 
 // Helper: Use OpenAI to extract a headline, CTA URL, images, and summary from adContext
 async function extractAdDataWithAI(adContext: string, openaiApiKey: string): Promise<{ headline: string | null; ctaUrl: string | null; images: string[]; summary: string | null }> {
-  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\n- images: An array of all image URLs (src attributes) that are valid https?:// URLs.\n- summary: A concise summary (1-2 sentences) of the ad's content, in plain English.\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null, "images": string[], "summary": string | null }.`;
+  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\n- images: An array of all image URLs (src attributes) that are valid https?:// URLs.\n- summary: A concise, informational summary (1-2 sentences) of the content, in plain English. Do not mention that it is an ad or advertisement; just summarize the information presented.\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null, "images": string[], "summary": string | null }.`;
 
   const userPrompt = `Ad context:\n\n${adContext}\n\nExtract headline, ctaUrl, images, and summary as described.`;
 

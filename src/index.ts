@@ -6,37 +6,52 @@ interface Env {
   OPENAI_API_KEY: string; // Secret for the OpenAI API key
 }
 
-// Helper to extract headlines and real CTA URLs from adContext
-function extractHeadlinesAndUrls(adContext: string): { headlines: string[]; ctaUrls: string[] } {
-  const headlines: string[] = [];
-  const ctaUrls: string[] = [];
-
-  // Extract headlines
-  const headlineRegex = /\[Headlines\]\s*([\s\S]*?)(?:\n\n|\[Page Content\])/;
-  const headlineMatch = headlineRegex.exec(adContext);
-  if (headlineMatch && headlineMatch[1]) {
-    headlines.push(...headlineMatch[1].split('\n').map(h => h.trim()).filter(Boolean));
-  }
-
-  // Extract CTA URLs (real URLs, not PRX_CLICK_URL placeholders)
-  // Match href="..." and extract URLs that are not PRX_CLICK_URL or variants
-  const urlRegex = /href="([^"]+)"/g;
-  let urlMatch;
-  while ((urlMatch = urlRegex.exec(adContext)) !== null) {
-    const url = urlMatch[1];
-    // Exclude PRX_CLICK_URL and similar placeholders
-    if (!/PRX_CLICK_URL/i.test(url) && /^https?:\/\//.test(url)) {
-      ctaUrls.push(url);
-    }
-  }
-
-  return { headlines, ctaUrls };
-}
-
 const app = new Hono<{ Bindings: Env }>();
 
 // Enable CORS
 app.use('*', cors());
+
+// Helper: Use OpenAI to extract a headline and a real CTA URL from adContext
+async function extractHeadlineAndUrlWithAI(adContext: string, openaiApiKey: string): Promise<{ headline: string | null; ctaUrl: string | null }> {
+  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null }.`;
+
+  const userPrompt = `Ad context:\n\n${adContext}\n\nExtract headline and ctaUrl as described.`;
+
+  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini-2025-04-14',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0,
+      max_tokens: 128,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!openaiResponse.ok) {
+    console.error('OpenAI extraction error:', await openaiResponse.text());
+    return { headline: null, ctaUrl: null };
+  }
+
+  const data = await openaiResponse.json();
+  try {
+    const parsed = JSON.parse(data.choices[0].message.content);
+    return {
+      headline: typeof parsed.headline === 'string' ? parsed.headline : null,
+      ctaUrl: typeof parsed.ctaUrl === 'string' ? parsed.ctaUrl : null
+    };
+  } catch (e) {
+    console.error('Failed to parse OpenAI extraction:', e, data);
+    return { headline: null, ctaUrl: null };
+  }
+}
 
 // Proxy the Qdrant query points endpoint with OpenAI embedding generation
 app.post('/query', async (c) => {
@@ -54,7 +69,7 @@ app.post('/query', async (c) => {
     }
 
     // Step 1: Generate embedding using OpenAI API
-    const openaiResponse = await fetch(openaiUrl, {
+    const openaiEmbeddingResponse = await fetch(openaiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,13 +78,13 @@ app.post('/query', async (c) => {
       body: JSON.stringify({ input, model }),
     });
 
-    if (!openaiResponse.ok) {
-      const error = await openaiResponse.json();
+    if (!openaiEmbeddingResponse.ok) {
+      const error = await openaiEmbeddingResponse.json();
       console.error('Error from OpenAI API:', error);
       return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);
     }
 
-    const openaiData = await openaiResponse.json();
+    const openaiData = await openaiEmbeddingResponse.json();
     const embedding = openaiData.data[0]?.embedding;
 
     if (!embedding) {
@@ -92,16 +107,17 @@ app.post('/query', async (c) => {
       return c.json({ error: 'Failed to query Qdrant API' }, 500);
     }
 
-    // Return the response from the Qdrant API, but add headlines and ctaUrls to each payload
+    // Process the response from the Qdrant API
     const qdrantData = await qdrantResponse.json();
     if (qdrantData?.result?.points) {
-      for (const point of qdrantData.result.points) {
+      // Run OpenAI extraction in parallel for all points
+      await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
-          const { headlines, ctaUrls } = extractHeadlinesAndUrls(point.payload.adContext);
-          point.payload.headlines = headlines;
-          point.payload.ctaUrls = ctaUrls;
+          const { headline, ctaUrl } = await extractHeadlineAndUrlWithAI(point.payload.adContext, openaiApiKey);
+          point.payload.headline = headline;
+          point.payload.ctaUrl = ctaUrl;
         }
-      }
+      }));
     }
     return c.json(qdrantData, qdrantResponse.status);
   } catch (error) {

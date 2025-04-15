@@ -10,7 +10,7 @@ paths:
   /query:
     post:
       summary: Query points with OpenAI embedding
-      description: Generate embeddings using OpenAI API and query points in Qdrant database. Headlines and valid CTA URLs are extracted from each adContext and included in the payload.
+      description: Generate embeddings using OpenAI API and query points in Qdrant database. For each result, extract headline, ctaUrl, images, and summary using OpenAI and return as a root-level ads array.
       operationId: queryPoints
       requestBody:
         description: Query configuration
@@ -53,6 +53,30 @@ paths:
               schema:
                 type: object
                 properties:
+                  ads:
+                    type: array
+                    description: List of deduplicated ads with extracted data
+                    items:
+                      type: object
+                      properties:
+                        headline:
+                          type: string
+                          nullable: true
+                          description: The most prominent or relevant headline
+                        ctaUrl:
+                          type: string
+                          nullable: true
+                          description: The first real call-to-action URL
+                        images:
+                          type: array
+                          items:
+                            type: string
+                            format: uri
+                          description: Array of image URLs
+                        summary:
+                          type: string
+                          nullable: true
+                          description: Concise summary of the ad content
                   result:
                     type: object
                     properties:
@@ -86,17 +110,20 @@ paths:
                                   type: string
                                 adContext:
                                   type: string
-                                headlines:
-                                  type: array
-                                  items:
-                                    type: string
-                                  description: Extracted headlines from the ad context
-                                ctaUrls:
+                                headline:
+                                  type: string
+                                  nullable: true
+                                ctaUrl:
+                                  type: string
+                                  nullable: true
+                                images:
                                   type: array
                                   items:
                                     type: string
                                     format: uri
-                                  description: Valid CTA URLs extracted from the ad context (real URLs only, no placeholders)
+                                summary:
+                                  type: string
+                                  nullable: true
                   usage:
                     type: object
                     properties:

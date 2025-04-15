@@ -109,6 +109,8 @@ app.post('/query', async (c) => {
 
     // Process the response from the Qdrant API
     const qdrantData = await qdrantResponse.json();
+    const allHeadlines: string[] = [];
+    const allCtaUrls: string[] = [];
     if (qdrantData?.result?.points) {
       // Run OpenAI extraction in parallel for all points
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
@@ -116,10 +118,27 @@ app.post('/query', async (c) => {
           const { headline, ctaUrl } = await extractHeadlineAndUrlWithAI(point.payload.adContext, openaiApiKey);
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;
+          if (headline && headline.trim()) allHeadlines.push(headline.trim());
+          if (ctaUrl && ctaUrl.trim()) allCtaUrls.push(ctaUrl.trim());
         }
       }));
     }
-    return c.json(qdrantData, qdrantResponse.status);
+    // Remove duplicate headlines (case-insensitive, trimmed)
+    const uniqueHeadlines = Array.from(
+      new Set(allHeadlines.map(h => h.toLowerCase()))
+    ).map(h => {
+      // Return the first original-cased headline that matches this lowercased version
+      return allHeadlines.find(orig => orig.toLowerCase() === h) || h;
+    });
+    // Remove duplicate ctaUrls
+    const uniqueCtaUrls = Array.from(new Set(allCtaUrls));
+
+    // Return the response with headlines and ctaUrls at the root
+    return c.json({
+      headlines: uniqueHeadlines,
+      ctaUrls: uniqueCtaUrls,
+      ...qdrantData
+    }, qdrantResponse.status);
   } catch (error) {
     console.error('Error processing request:', error);
     return c.json({ error: 'Internal server error' }, 500);

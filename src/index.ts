@@ -11,11 +11,11 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS
 app.use('*', cors());
 
-// Helper: Use OpenAI to extract a headline and a real CTA URL from adContext
-async function extractHeadlineAndUrlWithAI(adContext: string, openaiApiKey: string): Promise<{ headline: string | null; ctaUrl: string | null }> {
-  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null }.`;
+// Helper: Use OpenAI to extract a headline, CTA URL, images, and summary from adContext
+async function extractAdDataWithAI(adContext: string, openaiApiKey: string): Promise<{ headline: string | null; ctaUrl: string | null; images: string[]; summary: string | null }> {
+  const systemPrompt = `You are an expert at extracting marketing information from HTML and text. Given an ad context, extract:\n- headline: The most prominent or relevant headline (as plain text, not HTML).\n- ctaUrl: The first real call-to-action URL (must be a valid https?:// URL, not a placeholder like PRX_CLICK_URL).\n- images: An array of all image URLs (src attributes) that are valid https?:// URLs.\n- summary: A concise summary (1-2 sentences) of the ad's content, in plain English.\nReturn a JSON object: { "headline": string | null, "ctaUrl": string | null, "images": string[], "summary": string | null }.`;
 
-  const userPrompt = `Ad context:\n\n${adContext}\n\nExtract headline and ctaUrl as described.`;
+  const userPrompt = `Ad context:\n\n${adContext}\n\nExtract headline, ctaUrl, images, and summary as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -30,14 +30,14 @@ async function extractHeadlineAndUrlWithAI(adContext: string, openaiApiKey: stri
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      max_tokens: 128,
+      max_tokens: 256,
       response_format: { type: 'json_object' }
     })
   });
 
   if (!openaiResponse.ok) {
     console.error('OpenAI extraction error:', await openaiResponse.text());
-    return { headline: null, ctaUrl: null };
+    return { headline: null, ctaUrl: null, images: [], summary: null };
   }
 
   const data = await openaiResponse.json();
@@ -45,11 +45,13 @@ async function extractHeadlineAndUrlWithAI(adContext: string, openaiApiKey: stri
     const parsed = JSON.parse(data.choices[0].message.content);
     return {
       headline: typeof parsed.headline === 'string' ? parsed.headline : null,
-      ctaUrl: typeof parsed.ctaUrl === 'string' ? parsed.ctaUrl : null
+      ctaUrl: typeof parsed.ctaUrl === 'string' ? parsed.ctaUrl : null,
+      images: Array.isArray(parsed.images) ? parsed.images.filter((img: string) => typeof img === 'string') : [],
+      summary: typeof parsed.summary === 'string' ? parsed.summary : null
     };
   } catch (e) {
     console.error('Failed to parse OpenAI extraction:', e, data);
-    return { headline: null, ctaUrl: null };
+    return { headline: null, ctaUrl: null, images: [], summary: null };
   }
 }
 
@@ -109,34 +111,30 @@ app.post('/query', async (c) => {
 
     // Process the response from the Qdrant API
     const qdrantData = await qdrantResponse.json();
-    const allHeadlines: string[] = [];
-    const allCtaUrls: string[] = [];
+    const pairs: { headline: string; ctaUrl: string; images: string[]; summary: string | null }[] = [];
     if (qdrantData?.result?.points) {
       // Run OpenAI extraction in parallel for all points
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
-          const { headline, ctaUrl } = await extractHeadlineAndUrlWithAI(point.payload.adContext, openaiApiKey);
+          const { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, openaiApiKey);
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;
-          if (headline && headline.trim()) allHeadlines.push(headline.trim());
-          if (ctaUrl && ctaUrl.trim()) allCtaUrls.push(ctaUrl.trim());
+          point.payload.images = images;
+          point.payload.summary = summary;
+          if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
+            pairs.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary });
+          }
         }
       }));
     }
-    // Remove duplicate headlines (case-insensitive, trimmed)
-    const uniqueHeadlines = Array.from(
-      new Set(allHeadlines.map(h => h.toLowerCase()))
-    ).map(h => {
-      // Return the first original-cased headline that matches this lowercased version
-      return allHeadlines.find(orig => orig.toLowerCase() === h) || h;
-    });
-    // Remove duplicate ctaUrls
-    const uniqueCtaUrls = Array.from(new Set(allCtaUrls));
+    // Remove duplicate pairs (by headline + ctaUrl)
+    const uniquePairs = Array.from(
+      new Map(pairs.map(p => [p.headline.toLowerCase() + '|' + p.ctaUrl, p])).values()
+    );
 
-    // Return the response with headlines and ctaUrls at the root
+    // Return the response with pairs at the root
     return c.json({
-      headlines: uniqueHeadlines,
-      ctaUrls: uniqueCtaUrls,
+      headlineCtaPairs: uniquePairs,
       ...qdrantData
     }, qdrantResponse.status);
   } catch (error) {

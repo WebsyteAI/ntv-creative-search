@@ -111,7 +111,7 @@ app.post('/query', async (c) => {
 
     // Process the response from the Qdrant API
     const qdrantData = await qdrantResponse.json();
-    const pairs: { headline: string; ctaUrl: string; images: string[]; summary: string | null }[] = [];
+    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null }[] = [];
     if (qdrantData?.result?.points) {
       // Run OpenAI extraction in parallel for all points
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
@@ -122,19 +122,19 @@ app.post('/query', async (c) => {
           point.payload.images = images;
           point.payload.summary = summary;
           if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
-            pairs.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary });
+            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary });
           }
         }
       }));
     }
-    // Remove duplicate pairs (by headline + ctaUrl)
-    const uniquePairs = Array.from(
-      new Map(pairs.map(p => [p.headline.toLowerCase() + '|' + p.ctaUrl, p])).values()
+    // Remove duplicate ads (by headline + ctaUrl)
+    const uniqueAds = Array.from(
+      new Map(ads.map(a => [a.headline.toLowerCase() + '|' + a.ctaUrl, a])).values()
     );
 
-    // Return the response with pairs at the root
+    // Return the response with ads at the root
     return c.json({
-      headlineCtaPairs: uniquePairs,
+      ads: uniqueAds,
       ...qdrantData
     }, qdrantResponse.status);
   } catch (error) {

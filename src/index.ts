@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 interface Env {
   QDRANT_API_KEY: string; // Secret for the Qdrant API key
@@ -6,6 +7,9 @@ interface Env {
 }
 
 const app = new Hono<{ Bindings: Env }>();
+
+// Enable CORS
+app.use('*', cors());
 
 // Proxy the Qdrant query points endpoint with OpenAI embedding generation
 app.post('/query', async (c) => {

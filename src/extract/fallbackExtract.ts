@@ -1,5 +1,5 @@
-// Fallback extraction for headline, ctaUrl, images from adContext
-export function fallbackExtract(adContext: string): { headline: string | null, ctaUrl: string | null, images: string[] } {
+// Fallback extraction for headline, ctaUrl, images, and summary from adContext
+export function fallbackExtract(adContext: string): { headline: string | null, ctaUrl: string | null, images: string[], summary: string | null } {
   // Headline: first non-empty line from [Headlines] section
   let headline: string | null = null;
   const headlineMatch = adContext.match(/\[Headlines\]\s*([\s\S]*?)(?:\n\n|\[Page Content\])/);
@@ -25,5 +25,19 @@ export function fallbackExtract(adContext: string): { headline: string | null, c
     if (/^https?:\/\//.test(src)) images.push(src);
   }
 
-  return { headline, ctaUrl, images };
+  // summary: fallback to first 1-2 sentences from [Page Content] or the first paragraph
+  let summary: string | null = null;
+  const pageContentMatch = adContext.match(/\[Page Content\]([\s\S]*)/);
+  if (pageContentMatch && pageContentMatch[1]) {
+    // Remove HTML tags
+    let text = pageContentMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // Get first 2 sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g);
+    if (sentences && sentences.length > 0) {
+      summary = sentences.slice(0, 2).join(' ').trim();
+    } else if (text.length > 0) {
+      summary = text.slice(0, 200).trim();
+    }
+  }
+  return { headline, ctaUrl, images, summary };
 }

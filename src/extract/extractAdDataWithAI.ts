@@ -17,7 +17,7 @@ export async function extractAdDataWithAI(adContext: string, openaiApiKey: strin
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      max_tokens: 256,
+      max_tokens: 1000,
       response_format: { type: 'json_object' }
     })
   });

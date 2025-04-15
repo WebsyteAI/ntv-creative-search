@@ -61,11 +61,13 @@ app.post('/query', async (c) => {
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
           let { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, openaiApiKey);
-          if (!headline || !ctaUrl || !images || images.length === 0) {
+          // Fallback extraction for missing fields
+          if (!headline || !ctaUrl || !images || images.length === 0 || !summary) {
             const fallback = fallbackExtract(point.payload.adContext);
             if (!headline) headline = fallback.headline;
             if (!ctaUrl) ctaUrl = fallback.ctaUrl;
             if (!images || images.length === 0) images = fallback.images;
+            if (!summary) summary = fallback.summary;
           }
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;

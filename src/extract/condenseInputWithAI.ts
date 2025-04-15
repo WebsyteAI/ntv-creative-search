@@ -16,7 +16,7 @@ export async function condenseInputWithAI(input: string, openaiApiKey: string): 
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      max_tokens: 32,
+      max_tokens: 1000,
       response_format: { type: 'text' }
     })
   });

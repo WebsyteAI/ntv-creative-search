@@ -11,6 +11,36 @@ const app = new Hono<{ Bindings: Env }>();
 // Enable CORS
 app.use('*', cors());
 
+// Improved fallback extraction for headline, ctaUrl, images
+function fallbackExtract(adContext: string): { headline: string | null, ctaUrl: string | null, images: string[] } {
+  // Headline: first non-empty line from [Headlines] section
+  let headline: string | null = null;
+  const headlineMatch = adContext.match(/\[Headlines\]\s*([\s\S]*?)(?:\n\n|\[Page Content\])/);
+  if (headlineMatch && headlineMatch[1]) {
+    const lines = headlineMatch[1].split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length > 0) headline = lines[0];
+  }
+
+  // ctaUrl: first valid https?:// URL in href, else PRX_CLICK_URL
+  let ctaUrl: string | null = null;
+  const urlRegex = /href="(https?:\/\/[^\"]+)"/gi;
+  const urlMatch = urlRegex.exec(adContext);
+  if (urlMatch && urlMatch[1]) ctaUrl = urlMatch[1];
+  if (!ctaUrl) ctaUrl = "PRX_CLICK_URL";
+
+  // images: all <img src="...">, handle protocol-relative URLs
+  const images: string[] = [];
+  const imgRegex = /<img[^>]+src="([^"]+)"/gi;
+  let imgMatch;
+  while ((imgMatch = imgRegex.exec(adContext)) !== null) {
+    let src = imgMatch[1];
+    if (src.startsWith('//')) src = 'https:' + src;
+    if (/^https?:\/\//.test(src)) images.push(src);
+  }
+
+  return { headline, ctaUrl, images };
+}
+
 // Helper: Use OpenAI to summarize/shorten the input for Qdrant queries
 async function condenseInputWithAI(input: string, openaiApiKey: string): Promise<string> {
   const systemPrompt = `You are an expert at search query optimization. Given a long or verbose user message, rewrite it as a short, focused search query that will work well for semantic search in a vector database. Remove unnecessary details, keep it concise, and focus on the main topic or intent.`;
@@ -151,7 +181,14 @@ app.post('/query', async (c) => {
       // Run OpenAI extraction in parallel for all points
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
-          const { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, openaiApiKey);
+          let { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, openaiApiKey);
+          // Fallback extraction for missing fields
+          if (!headline || !ctaUrl || !images || images.length === 0) {
+            const fallback = fallbackExtract(point.payload.adContext);
+            if (!headline) headline = fallback.headline;
+            if (!ctaUrl) ctaUrl = fallback.ctaUrl;
+            if (!images || images.length === 0) images = fallback.images;
+          }
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;
           point.payload.images = images;
@@ -167,9 +204,10 @@ app.post('/query', async (c) => {
       new Map(ads.map(a => [a.headline.toLowerCase() + '|' + a.ctaUrl, a])).values()
     );
 
-    // Return the response with ads at the root
+    // Return the response with ads and condensedInput at the root
     return c.json({
       ads: uniqueAds,
+      condensedInput,
       ...qdrantData
     }, qdrantResponse.status);
   } catch (error) {

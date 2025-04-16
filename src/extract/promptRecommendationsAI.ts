@@ -1,6 +1,6 @@
 // Use OpenAI to generate prompt recommendations for learning more about the ad
 export async function promptRecommendationsAI(adContext: string, openaiApiKey: string): Promise<string[]> {
-  const systemPrompt = `You are an expert at helping users explore and learn more about products and services. Given an ad context, generate a list of 3-5 engaging, specific, and helpful prompt recommendations (questions or requests) that a user could ask to learn more about the product, service, or offer described. Each prompt should be concise and focused on the information in the ad. Return as a JSON array of strings.`;
+  const systemPrompt = `You are an expert at helping users explore and learn more about products and services. Given an ad context, generate a list of 3-5 engaging, specific, and helpful prompt recommendations (questions or requests) that a user could ask to learn more about the product, service, or offer described. Each prompt should be concise and focused on the information in the ad. Return as a JSON object: { "prompts": [ ... ] }`;
   const userPrompt = `Ad context:\n\n${adContext}\n\nGenerate prompt recommendations as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -17,7 +17,7 @@ export async function promptRecommendationsAI(adContext: string, openaiApiKey: s
       ],
       temperature: 0,
       max_tokens: 500,
-      response_format: { type: 'json_array' }
+      response_format: { type: 'json_object' }
     })
   });
 
@@ -27,9 +27,9 @@ export async function promptRecommendationsAI(adContext: string, openaiApiKey: s
   }
   const data = await openaiResponse.json();
   try {
-    const prompts = JSON.parse(data.choices[0].message.content);
-    if (Array.isArray(prompts)) {
-      return prompts.filter((p: any) => typeof p === 'string');
+    const obj = JSON.parse(data.choices[0].message.content);
+    if (obj && Array.isArray(obj.prompts)) {
+      return obj.prompts.filter((p: any) => typeof p === 'string');
     }
     return [];
   } catch (e) {

@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { fallbackExtract } from './extract/fallbackExtract';
 import { condenseInputWithAI } from './extract/condenseInputWithAI';
 import { extractAdDataWithAI } from './extract/extractAdDataWithAI';
+import { promptRecommendationsAI } from './extract/promptRecommendationsAI';
 
 interface Env {
   QDRANT_API_KEY: string;
@@ -56,7 +57,7 @@ app.post('/query', async (c) => {
       return c.json({ error: 'Failed to query Qdrant API' }, 500);
     }
     const qdrantData = await qdrantResponse.json();
-    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null }[] = [];
+    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null; promptRecommendations: string[] }[] = [];
     if (qdrantData?.result?.points) {
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
@@ -69,12 +70,15 @@ app.post('/query', async (c) => {
             if (!images || images.length === 0) images = fallback.images;
             if (!summary) summary = fallback.summary;
           }
+          // Prompt recommendations
+          const promptRecommendations = await promptRecommendationsAI(point.payload.adContext, openaiApiKey);
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;
           point.payload.images = images;
           point.payload.summary = summary;
+          point.payload.promptRecommendations = promptRecommendations;
           if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
-            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary });
+            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary, promptRecommendations });
           }
         }
       }));

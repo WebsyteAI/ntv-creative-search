@@ -1,5 +1,4 @@
 import { condenseInputWithAI } from '../extract/condenseInputWithAI';
-import { extractAdDataWithAI } from '../extract/extractAdDataWithAI';
 import { fallbackExtract } from '../extract/fallbackExtract';
 import { HonoContext } from 'hono';
 
@@ -46,15 +45,10 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
     if (!point || !point.payload || typeof point.payload.adContext !== 'string') {
       return c.text('No match found', 404);
     }
-    let { headline, ctaUrl, summary } = await extractAdDataWithAI(point.payload.adContext, env.OPENAI_API_KEY);
-    if (!headline || !ctaUrl || !summary) {
-      const fallback = fallbackExtract(point.payload.adContext);
-      if (!headline) headline = fallback.headline;
-      if (!ctaUrl) ctaUrl = fallback.ctaUrl;
-      if (!summary) summary = fallback.summary;
-    }
+    // Only fallback extraction for headline, ctaUrl, summary
+    const { headline, ctaUrl, summary } = fallbackExtract(point.payload.adContext);
     // Return a simple HTML snippet
-    const html = `<div><strong>${headline}</strong><br>${summary}<br><a href="${ctaUrl}" target="_blank" rel="noopener">Learn more</a></div>`;
+    const html = `<div><strong>${headline || ''}</strong><br>${summary || ''}<br><a href="${ctaUrl || '#'}" target="_blank" rel="noopener">Learn more</a></div>`;
     return c.html(html);
   } catch (error) {
     console.error('Error in /simple:', error);

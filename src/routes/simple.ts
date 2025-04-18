@@ -47,8 +47,9 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
     }
     // Only fallback extraction for headline, ctaUrl, summary
     const { headline, ctaUrl, summary } = fallbackExtract(point.payload.adContext);
-    // Return a simple HTML snippet
-    const html = `<div><strong>${headline || ''}</strong><br>${summary || ''}<br><a href="${ctaUrl || '#'}" target="_blank" rel="noopener">Learn more</a></div>`;
+    // Return a minimal HTML snippet: text and anchor only
+    const text = [headline, summary].filter(Boolean).join(' - ');
+    const html = `${text} <a href="${ctaUrl || '#'}" target="_blank" rel="noopener">Learn more</a>`;
     return c.html(html);
   } catch (error) {
     console.error('Error in /simple:', error);

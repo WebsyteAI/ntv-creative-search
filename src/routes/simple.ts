@@ -1,6 +1,36 @@
 import { condenseInputWithAI } from '../extract/condenseInputWithAI';
-import { fallbackExtract } from '../extract/fallbackExtract';
 import { HonoContext } from 'hono';
+
+// Use OpenAI to generate minimal HTML summary for the top match
+async function aiGenerateSimpleHtml(adContext: string, openaiApiKey: string): Promise<string> {
+  const systemPrompt = `You are an expert at summarizing and presenting information. Given an ad context, generate a single line of plain text summarizing the main value or offer, followed by a single anchor tag (with the best CTA URL from the ad, or PRX_CLICK_URL if none) labeled 'Learn more'. The output should be minimal HTML: just the text and the anchor tag, nothing else. Example: "Headline - summary <a href=\"URL\">Learn more</a>"`;
+  const userPrompt = `Ad context:\n\n${adContext}\n\nGenerate the minimal HTML as described.`;
+
+  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini-2025-04-14',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0,
+      max_tokens: 300,
+      response_format: { type: 'text' }
+    })
+  });
+
+  if (!openaiResponse.ok) {
+    console.error('OpenAI simple HTML error:', await openaiResponse.text());
+    return '';
+  }
+  const data = await openaiResponse.json();
+  return data.choices?.[0]?.message?.content?.trim() || '';
+}
 
 export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
   const env = c.env;
@@ -45,11 +75,8 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
     if (!point || !point.payload || typeof point.payload.adContext !== 'string') {
       return c.text('No match found', 404);
     }
-    // Only fallback extraction for headline, ctaUrl, summary
-    const { headline, ctaUrl, summary } = fallbackExtract(point.payload.adContext);
-    // Return a minimal HTML snippet: text and anchor only
-    const text = [headline, summary].filter(Boolean).join(' - ');
-    const html = `${text} <a href="${ctaUrl || '#'}" target="_blank" rel="noopener">Learn more</a>`;
+    // Use AI to generate the minimal HTML
+    const html = await aiGenerateSimpleHtml(point.payload.adContext, env.OPENAI_API_KEY);
     return c.html(html);
   } catch (error) {
     console.error('Error in /simple:', error);

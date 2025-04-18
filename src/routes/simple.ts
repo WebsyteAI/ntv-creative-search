@@ -40,7 +40,7 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
   try {
     const { input, model = 'text-embedding-3-small', with_payload = true, ...qdrantParams } = await c.req.json();
     if (!input) {
-      return c.text('Input text is required for embedding generation', 400);
+      return c.json({ error: 'Input text is required for embedding generation' }, 400);
     }
     const condensedInput = await condenseInputWithAI(input, env.OPENAI_API_KEY);
     const openaiEmbeddingResponse = await fetch(openaiUrl, {
@@ -52,12 +52,12 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
       body: JSON.stringify({ input: condensedInput, model }),
     });
     if (!openaiEmbeddingResponse.ok) {
-      return c.text('Failed to generate embedding from OpenAI API', 500);
+      return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);
     }
     const openaiData = await openaiEmbeddingResponse.json();
     const embedding = openaiData.data[0]?.embedding;
     if (!embedding) {
-      return c.text('No embedding returned from OpenAI API', 500);
+      return c.json({ error: 'No embedding returned from OpenAI API' }, 500);
     }
     const qdrantResponse = await fetch(qdrantUrl, {
       method: 'POST',
@@ -68,18 +68,18 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
       body: JSON.stringify({ ...qdrantParams, query: embedding, with_payload, limit: 1 }),
     });
     if (!qdrantResponse.ok) {
-      return c.text('Failed to query Qdrant API', 500);
+      return c.json({ error: 'Failed to query Qdrant API' }, 500);
     }
     const qdrantData = await qdrantResponse.json();
     const point = qdrantData?.result?.points?.[0];
     if (!point || !point.payload) {
-      return c.text('No match found', 404);
+      return c.json({ error: 'No match found' }, 404);
     }
     // Use AI to generate the minimal HTML, passing the full payload
     const html = await aiGenerateSimpleHtml(point.payload, env.OPENAI_API_KEY);
-    return c.html(html);
+    return c.json({ html });
   } catch (error) {
     console.error('Error in /simple:', error);
-    return c.text('Internal server error', 500);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 }

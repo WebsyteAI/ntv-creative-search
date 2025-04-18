@@ -1,4 +1,3 @@
-import { condenseInputWithAI } from '../extract/condenseInputWithAI';
 import { HonoContext } from 'hono';
 
 // Use OpenAI to generate minimal HTML summary for the top match
@@ -42,14 +41,14 @@ export async function handleSimpleEndpoint(c: HonoContext<any, any, any>) {
     if (!input) {
       return c.json({ error: 'Input text is required for embedding generation' }, 400);
     }
-    const condensedInput = await condenseInputWithAI(input, env.OPENAI_API_KEY);
+    // Use the raw input for Qdrant embedding
     const openaiEmbeddingResponse = await fetch(openaiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({ input: condensedInput, model }),
+      body: JSON.stringify({ input, model }),
     });
     if (!openaiEmbeddingResponse.ok) {
       return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);

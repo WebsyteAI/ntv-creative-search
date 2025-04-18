@@ -3,7 +3,7 @@ import { HonoContext } from 'hono';
 
 // Use OpenAI to generate minimal HTML summary for the top match
 async function aiGenerateSimpleHtml(payload: any, openaiApiKey: string): Promise<string> {
-  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate a single line of plain text summarizing the main value or offer, followed by a single anchor tag (with the best CTA URL from the object, or PRX_CLICK_URL if none) labeled 'Learn more'. The output should be minimal HTML: just the text and the anchor tag, nothing else. Example: "Headline - summary <a href=\"URL\">Learn more</a>"`;
+  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate a single line of plain text summarizing the main value or offer, followed by a single anchor tag (using the targetURL field as the href) labeled 'Learn more'. The output should be minimal HTML: just the text and the anchor tag, nothing else. Example: "Headline - summary <a href=\"URL\">Learn more</a>"`;
   const userPrompt = `Ad object:\n\n${JSON.stringify(payload)}\n\nGenerate the minimal HTML as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

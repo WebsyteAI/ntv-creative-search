@@ -2,7 +2,7 @@ import { HonoContext } from 'hono';
 
 // Use OpenAI to generate a question and button link for the top match
 async function aiGenerateButtonData(payload: any, openaiApiKey: string): Promise<{ question: string, buttonLink: string }> {
-  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate:\n- question: A single, concise question a user might ask to learn more about the offer (e.g., 'What are the key features of this product?').\n- buttonLink: The best CTA URL from the object (use the targetURL field).\nReturn as a JSON object: { "question": string, "buttonLink": string }`;
+  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate:\n- question: A single, concise question that invites the user to speak to a product expert or agent if appropriate (e.g., 'Want to learn more with a Vitamix expert?'). If not appropriate, generate a question a user might ask to learn more about the offer.\n- buttonLink: The best CTA URL from the object (use the targetURL field).\nReturn as a JSON object: { "question": string, "buttonLink": string }`;
   const userPrompt = `Ad object:\n\n${JSON.stringify(payload)}\n\nGenerate the object as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

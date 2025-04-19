@@ -1,8 +1,8 @@
 import { HonoContext } from 'hono';
 
-// Use OpenAI to generate a question and button link for the top match
-async function aiGenerateButtonData(payload: any, openaiApiKey: string): Promise<{ question: string, buttonLink: string }> {
-  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate:\n- question: A single, concise question that invites the user to speak to a product expert or agent if appropriate (e.g., 'Want to learn more with a Vitamix expert?'). If not appropriate, generate a question a user might ask to learn more about the offer.\n- buttonLink: The best CTA URL from the object (use the targetURL field).\nReturn as a JSON object: { "question": string, "buttonLink": string }`;
+// Use OpenAI to generate a question and a product agent chat prompt for the top match
+async function aiGenerateButtonData(payload: any, openaiApiKey: string): Promise<{ question: string, prompt: string }> {
+  const systemPrompt = `You are an expert at summarizing and presenting information. Given a JSON object representing an ad (including fields like adContext, targetURL, etc), generate:\n- question: A single, concise question that invites the user to speak to a product expert or agent if appropriate (e.g., 'Want to learn more with a Vitamix expert?'). If not appropriate, generate a question a user might ask to learn more about the offer.\n- prompt: A product-specific prompt that could be used to start a new chat with a product agent, tailored to the product or service in the ad.\nReturn as a JSON object: { "question": string, "prompt": string }`;
   const userPrompt = `Ad object:\n\n${JSON.stringify(payload)}\n\nGenerate the object as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -25,18 +25,18 @@ async function aiGenerateButtonData(payload: any, openaiApiKey: string): Promise
 
   if (!openaiResponse.ok) {
     console.error('OpenAI button data error:', await openaiResponse.text());
-    return { question: '', buttonLink: '' };
+    return { question: '', prompt: '' };
   }
   const data = await openaiResponse.json();
   try {
     const obj = JSON.parse(data.choices[0].message.content);
     return {
       question: typeof obj.question === 'string' ? obj.question : '',
-      buttonLink: typeof obj.buttonLink === 'string' ? obj.buttonLink : ''
+      prompt: typeof obj.prompt === 'string' ? obj.prompt : ''
     };
   } catch (e) {
     console.error('Failed to parse OpenAI button data:', e, data);
-    return { question: '', buttonLink: '' };
+    return { question: '', prompt: '' };
   }
 }
 
@@ -83,7 +83,7 @@ export async function handleButtonEndpoint(c: HonoContext<any, any, any>) {
     if (!point || !point.payload) {
       return c.json({ error: 'No match found' }, 404);
     }
-    // Use AI to generate the question and buttonLink, passing the full payload
+    // Use AI to generate the question and prompt, passing the full payload
     const result = await aiGenerateButtonData(point.payload, env.OPENAI_API_KEY);
     return c.json(result);
   } catch (error) {

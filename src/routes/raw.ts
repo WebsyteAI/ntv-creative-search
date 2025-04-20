@@ -7,31 +7,30 @@ export async function handleRawEndpoint(c: HonoContext<any, any, any>) {
 
   try {
     const body = await c.req.json();
-    let { input, vector, model = 'text-embedding-3-small', ...rest } = body;
-    // If input is present, generate embedding
-    if (input) {
-      const openaiEmbeddingResponse = await fetch(openaiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({ input, model }),
-      });
-      if (!openaiEmbeddingResponse.ok) {
-        return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);
-      }
-      const openaiData = await openaiEmbeddingResponse.json();
-      vector = openaiData.data[0]?.embedding;
-      if (!vector) {
-        return c.json({ error: 'No embedding returned from OpenAI API' }, 500);
-      }
+    const { input, ...rest } = body;
+    const model = 'text-embedding-3-small';
+    if (!input) {
+      return c.json({ error: 'Input is required for embedding generation' }, 400);
     }
+    // Always generate embedding from input
+    const openaiEmbeddingResponse = await fetch(openaiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({ input, model }),
+    });
+    if (!openaiEmbeddingResponse.ok) {
+      return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);
+    }
+    const openaiData = await openaiEmbeddingResponse.json();
+    const vector = openaiData.data[0]?.embedding;
     if (!vector) {
-      return c.json({ error: 'Either input or vector must be provided' }, 400);
+      return c.json({ error: 'No embedding returned from OpenAI API' }, 500);
     }
     // Remove input from the body before sending to Qdrant
-    const qdrantBody = { ...rest, vector, model };
+    const qdrantBody = { ...rest, vector };
     const qdrantResponse = await fetch(qdrantUrl, {
       method: 'POST',
       headers: {

@@ -165,22 +165,20 @@ paths:
                     type: string
   /raw:
     post:
-      summary: Proxy Qdrant query
-      description: Directly proxy a Qdrant query and return the raw result. The request body should match the Qdrant API's /points/query endpoint.
+      summary: Proxy Qdrant query with embedding conversion
+      description: Accepts an input string, generates an embedding using OpenAI (model: text-embedding-3-small), and proxies the query to Qdrant. All other Qdrant query parameters (filter, limit, etc.) are supported.
       operationId: rawQdrantQuery
       requestBody:
-        description: Qdrant query body (see Qdrant API docs)
+        description: Qdrant query body with input (string) and any other Qdrant query parameters (see Qdrant API docs)
         required: true
         content:
           application/json:
             schema:
               type: object
               properties:
-                vector:
-                  type: array
-                  items:
-                    type: number
-                  description: The query vector for similarity search
+                input:
+                  type: string
+                  description: Text input to generate embedding (required)
                 filter:
                   type: object
                   description: Qdrant filter object
@@ -201,7 +199,7 @@ paths:
                   type: object
                   description: Additional search params
                   additionalProperties: true
-              required: [vector, limit]
+              required: [input]
       responses:
         '200':
           description: Raw Qdrant response

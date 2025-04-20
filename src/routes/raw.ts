@@ -29,8 +29,8 @@ export async function handleRawEndpoint(c: HonoContext<any, any, any>) {
     if (!embedding) {
       return c.json({ error: 'No embedding returned from OpenAI API' }, 500);
     }
-    // Use 'query' instead of 'vector' for Qdrant
-    const qdrantBody = { ...qdrantParams, query: embedding };
+    // Always set with_payload to true
+    const qdrantBody = { ...qdrantParams, query: embedding, with_payload: true };
     const qdrantResponse = await fetch(qdrantUrl, {
       method: 'POST',
       headers: {

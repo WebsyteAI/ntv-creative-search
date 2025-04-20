@@ -7,7 +7,7 @@ export async function handleRawEndpoint(c: HonoContext<any, any, any>) {
 
   try {
     const body = await c.req.json();
-    const { input, ...rest } = body;
+    const { input, ...qdrantParams } = body;
     const model = 'text-embedding-3-small';
     if (!input) {
       return c.json({ error: 'Input is required for embedding generation' }, 400);
@@ -25,12 +25,12 @@ export async function handleRawEndpoint(c: HonoContext<any, any, any>) {
       return c.json({ error: 'Failed to generate embedding from OpenAI API' }, 500);
     }
     const openaiData = await openaiEmbeddingResponse.json();
-    const vector = openaiData.data[0]?.embedding;
-    if (!vector) {
+    const embedding = openaiData.data[0]?.embedding;
+    if (!embedding) {
       return c.json({ error: 'No embedding returned from OpenAI API' }, 500);
     }
-    // Remove input from the body before sending to Qdrant
-    const qdrantBody = { ...rest, vector };
+    // Use 'query' instead of 'vector' for Qdrant
+    const qdrantBody = { ...qdrantParams, query: embedding };
     const qdrantResponse = await fetch(qdrantUrl, {
       method: 'POST',
       headers: {

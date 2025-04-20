@@ -77,6 +77,14 @@ paths:
                           type: string
                           nullable: true
                           description: Concise summary of the ad content
+                        promptRecommendations:
+                          type: array
+                          items:
+                            type: string
+                          description: List of prompt recommendations for the ad
+                  condensedInput:
+                    type: string
+                    description: The condensed input used for the Qdrant query
                   result:
                     type: object
                     properties:
@@ -110,6 +118,17 @@ paths:
                                   type: string
                                 adContext:
                                   type: string
+                                preview_image_urls:
+                                  type: array
+                                  items:
+                                    type: string
+                                    format: uri
+                                advertiser_logo_url:
+                                  type: string
+                                  format: uri
+                                target_url:
+                                  type: string
+                                  format: uri
                                 headline:
                                   type: string
                                   nullable: true
@@ -124,6 +143,11 @@ paths:
                                 summary:
                                   type: string
                                   nullable: true
+                                promptRecommendations:
+                                  type: array
+                                  items:
+                                    type: string
+                              additionalProperties: true
                   usage:
                     type: object
                     properties:
@@ -139,3 +163,98 @@ paths:
                     description: Time spent to process this request
                   status:
                     type: string
+  /raw:
+    post:
+      summary: Proxy Qdrant query
+      description: Directly proxy a Qdrant query and return the raw result. The request body should match the Qdrant API's /points/query endpoint.
+      operationId: rawQdrantQuery
+      requestBody:
+        description: Qdrant query body (see Qdrant API docs)
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vector:
+                  type: array
+                  items:
+                    type: number
+                  description: The query vector for similarity search
+                filter:
+                  type: object
+                  description: Qdrant filter object
+                  additionalProperties: true
+                limit:
+                  type: integer
+                  description: Max number of points to return
+                offset:
+                  type: integer
+                  description: Offset of the result
+                with_payload:
+                  type: boolean
+                  description: Whether to include payload in the response
+                with_vector:
+                  type: boolean
+                  description: Whether to include vector in the response
+                params:
+                  type: object
+                  description: Additional search params
+                  additionalProperties: true
+              required: [vector, limit]
+      responses:
+        '200':
+          description: Raw Qdrant response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      points:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              oneOf:
+                                - type: integer
+                                - type: string
+                            version:
+                              type: integer
+                            score:
+                              type: number
+                            payload:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                type:
+                                  type: string
+                                created:
+                                  type: string
+                                  format: date-time
+                                advertiser:
+                                  type: string
+                                adContext:
+                                  type: string
+                                preview_image_urls:
+                                  type: array
+                                  items:
+                                    type: string
+                                    format: uri
+                                advertiser_logo_url:
+                                  type: string
+                                  format: uri
+                                target_url:
+                                  type: string
+                                  format: uri
+                              additionalProperties: true
+                  status:
+                    type: string
+                  time:
+                    type: number

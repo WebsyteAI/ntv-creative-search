@@ -1,4 +1,3 @@
-import { fallbackExtract } from '../extract/fallbackExtract';
 import { extractAdDataWithAI } from '../extract/extractAdDataWithAI';
 import { promptRecommendationsAI } from '../extract/promptRecommendationsAI';
 import { HonoContext } from 'hono';
@@ -50,14 +49,7 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
     if (qdrantData?.result?.points) {
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
-          let { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, env.OPENAI_API_KEY);
-          if (!headline || !ctaUrl || !images || images.length === 0 || !summary) {
-            const fallback = fallbackExtract(point.payload.adContext);
-            if (!headline) headline = fallback.headline;
-            if (!ctaUrl) ctaUrl = fallback.ctaUrl;
-            if (!images || images.length === 0) images = fallback.images;
-            if (!summary) summary = fallback.summary;
-          }
+          const { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, env.OPENAI_API_KEY);
           const promptRecommendations = await promptRecommendationsAI(point.payload.adContext, env.OPENAI_API_KEY);
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;

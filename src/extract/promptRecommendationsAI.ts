@@ -1,7 +1,7 @@
 // Use OpenAI to generate prompt recommendations for learning more about the ad
 export async function promptRecommendationsAI(adContext: string, openaiApiKey: string): Promise<string[]> {
-  const systemPrompt = `You are an expert at helping users explore and learn more about products and services. Given an ad context, generate a list of 3 engaging, specific, and helpful prompt recommendations (questions or requests) that a user could ask to learn more about the product, service, or offer described. Each prompt should be concise and focused on the information in the ad. Return as a JSON object: { "prompts": [ ... ] }`;
-  const userPrompt = `Ad context:\n\n${adContext}\n\nGenerate prompt recommendations as described.`;
+  const systemPrompt = `You are an expert at helping users explore and learn more about products and services. Given a context, generate a list of 3 engaging, specific, and helpful prompt recommendations (questions or requests) that a user could ask to learn more about the product, service, or offer described. Each prompt should be concise, focused on the information, and should not mention that it is an ad or advertisement. Return as a JSON object: { "prompts": [ ... ] }`;
+  const userPrompt = `Context:\n\n${adContext}\n\nGenerate prompt recommendations as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

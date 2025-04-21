@@ -1,5 +1,4 @@
 import { fallbackExtract } from '../extract/fallbackExtract';
-import { condenseInputWithAI } from '../extract/condenseInputWithAI';
 import { extractAdDataWithAI } from '../extract/extractAdDataWithAI';
 import { promptRecommendationsAI } from '../extract/promptRecommendationsAI';
 import { HonoContext } from 'hono';
@@ -14,14 +13,14 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
     if (!input) {
       return c.json({ error: 'Input text is required for embedding generation' }, 400);
     }
-    const condensedInput = await condenseInputWithAI(input, env.OPENAI_API_KEY);
+    // Use the raw input for Qdrant embedding
     const openaiEmbeddingResponse = await fetch(openaiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({ input: condensedInput, model }),
+      body: JSON.stringify({ input, model }),
     });
     if (!openaiEmbeddingResponse.ok) {
       const error = await openaiEmbeddingResponse.json();
@@ -76,7 +75,7 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
     );
     return c.json({
       ads: uniqueAds,
-      condensedInput,
+      condensedInput: input,
       ...qdrantData
     }, qdrantResponse.status);
   } catch (error) {

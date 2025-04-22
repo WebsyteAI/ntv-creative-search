@@ -52,8 +52,8 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
     // Parallelize all AI calls for each ad
     const ads = await Promise.all(
       topPoints.map(async (point: any) => {
-        if (!point.payload || typeof point.payload.adContext !== 'string') return null;
-        const adContext = point.payload.adContext;
+        if (!point.payload) return null;
+        const adContext = point.payload; // Use the whole payload as context
         // Run all AI calls in parallel
         const [adData, promptRecs, questionsForUser] = await Promise.all([
           extractAdDataWithAI(adContext, env.OPENAI_API_KEY),

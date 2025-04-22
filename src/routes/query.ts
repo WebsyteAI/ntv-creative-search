@@ -46,34 +46,48 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
       return c.json({ error: 'Failed to query Qdrant API' }, 500);
     }
     const qdrantData = await qdrantResponse.json();
-    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null; promptRecommendations: string[]; questionsForUser: string[]; advertiser: string | null; advertiser_logo_url: string | null }[] = [];
-    if (qdrantData?.result?.points) {
-      await Promise.all(qdrantData.result.points.map(async (point: any) => {
-        if (point.payload && typeof point.payload.adContext === 'string') {
-          const { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, env.OPENAI_API_KEY);
-          const promptRecommendations = await promptRecommendationsAI(point.payload.adContext, env.OPENAI_API_KEY);
-          const questionsForUser = await questionsForUserAI(point.payload.adContext, env.OPENAI_API_KEY);
-          const advertiser = point.payload.advertiser || null;
-          const advertiser_logo_url = point.payload.advertiser_logo_url || null;
-          point.payload.headline = headline;
-          point.payload.ctaUrl = ctaUrl;
-          point.payload.images = images;
-          point.payload.summary = summary;
-          point.payload.promptRecommendations = promptRecommendations;
-          point.payload.questionsForUser = questionsForUser;
-          if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
-            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary, promptRecommendations, questionsForUser, advertiser, advertiser_logo_url });
-          }
+    const points = qdrantData?.result?.points || [];
+    // Limit to top 10 for performance (optional)
+    const topPoints = points.slice(0, 10);
+    // Parallelize all AI calls for each ad
+    const ads = await Promise.all(
+      topPoints.map(async (point: any) => {
+        if (!point.payload || typeof point.payload.adContext !== 'string') return null;
+        const adContext = point.payload.adContext;
+        // Run all AI calls in parallel
+        const [adData, promptRecs, questionsForUser] = await Promise.all([
+          extractAdDataWithAI(adContext, env.OPENAI_API_KEY),
+          promptRecommendationsAI(adContext, env.OPENAI_API_KEY),
+          questionsForUserAI(adContext, env.OPENAI_API_KEY),
+        ]);
+        const advertiser = point.payload.advertiser || null;
+        const advertiser_logo_url = point.payload.advertiser_logo_url || null;
+        const { headline, ctaUrl, images, summary } = adData;
+        if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
+          return {
+            headline: headline.trim(),
+            ctaUrl: ctaUrl.trim(),
+            images,
+            summary,
+            promptRecommendations: promptRecs,
+            questionsForUser,
+            advertiser,
+            advertiser_logo_url,
+          };
         }
-      }));
-    }
+        return null;
+      })
+    );
+    // Remove nulls and deduplicate
     const uniqueAds = Array.from(
-      new Map(ads.map(a => [a.headline.toLowerCase() + '|' + a.ctaUrl, a])).values()
+      new Map(
+        ads.filter(Boolean).map(a => [a!.headline.toLowerCase() + '|' + a!.ctaUrl, a!])
+      ).values()
     );
     return c.json({
       ads: uniqueAds,
       condensedInput: input,
-      ...qdrantData
+      ...qdrantData,
     }, qdrantResponse.status);
   } catch (error) {
     console.error('Error processing request:', error);

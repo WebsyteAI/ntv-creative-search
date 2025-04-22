@@ -45,21 +45,21 @@ export async function handleQueryEndpoint(c: HonoContext<any, any, any>) {
       return c.json({ error: 'Failed to query Qdrant API' }, 500);
     }
     const qdrantData = await qdrantResponse.json();
-    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null; promptRecommendations: string[]; advertiser_logo: string | null; name: string | null }[] = [];
+    const ads: { headline: string; ctaUrl: string; images: string[]; summary: string | null; promptRecommendations: string[]; advertiser: string | null; advertiser_logo_url: string | null }[] = [];
     if (qdrantData?.result?.points) {
       await Promise.all(qdrantData.result.points.map(async (point: any) => {
         if (point.payload && typeof point.payload.adContext === 'string') {
           const { headline, ctaUrl, images, summary } = await extractAdDataWithAI(point.payload.adContext, env.OPENAI_API_KEY);
           const promptRecommendations = await promptRecommendationsAI(point.payload.adContext, env.OPENAI_API_KEY);
-          const advertiser_logo = point.payload.advertiser_logo_url || null;
-          const name = point.payload.name || null;
+          const advertiser = point.payload.advertiser || null;
+          const advertiser_logo_url = point.payload.advertiser_logo_url || null;
           point.payload.headline = headline;
           point.payload.ctaUrl = ctaUrl;
           point.payload.images = images;
           point.payload.summary = summary;
           point.payload.promptRecommendations = promptRecommendations;
           if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
-            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary, promptRecommendations, advertiser_logo, name });
+            ads.push({ headline: headline.trim(), ctaUrl: ctaUrl.trim(), images, summary, promptRecommendations, advertiser, advertiser_logo_url });
           }
         }
       }));

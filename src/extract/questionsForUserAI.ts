@@ -1,7 +1,8 @@
 // Use OpenAI to generate questions the ad would want to ask the user
-export async function questionsForUserAI(adContext: string, openaiApiKey: string): Promise<string[]> {
+export async function questionsForUserAI(adContext: string | object, openaiApiKey: string): Promise<string[]> {
+  const context = typeof adContext === 'string' ? adContext : JSON.stringify(adContext);
   const systemPrompt = `You are an expert at conversational marketing. Given a context, generate a list of 3 engaging, specific, and helpful questions that the product, service, or advertiser would want to ask the user to better understand their needs, preferences, or intent. Each question should be concise, focused on the information, and should not mention that it is an ad or advertisement. Return as a JSON object: { "questions": [ ... ] }`;
-  const userPrompt = `Context:\n\n${adContext}\n\nGenerate questions for the user as described.`;
+  const userPrompt = `Context:\n\n${context}\n\nGenerate questions for the user as described.`;
 
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

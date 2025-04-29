@@ -5,6 +5,7 @@ import { handleQueryOneEndpoint } from './routes/queryOne';
 import { handleSimpleEndpoint } from './routes/simple';
 import { handleButtonEndpoint } from './routes/button';
 import { handleRawEndpoint } from './routes/raw';
+import { handleApiQueryEndpoint } from './routes/apiQuery';
 import { handleHealthCheck } from './routes/health';
 
 interface Env {
@@ -21,5 +22,6 @@ app.post('/query-one', handleQueryOneEndpoint);
 app.post('/simple', handleSimpleEndpoint);
 app.post('/button', handleButtonEndpoint);
 app.post('/raw', handleRawEndpoint);
+app.post('/api/query', handleApiQueryEndpoint);
 
 export default app;

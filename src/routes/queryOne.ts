@@ -1,6 +1,5 @@
 import { extractAdDataWithAI } from '../extract/extractAdDataWithAI';
 import { promptRecommendationsAI } from '../extract/promptRecommendationsAI';
-import { questionsForUserAI } from '../extract/questionsForUserAI';
 import { HonoContext } from 'hono';
 
 export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
@@ -52,11 +51,10 @@ export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
       return c.json({ ads: [], condensedInput: input, ...qdrantData }, qdrantResponse.status);
     }
     const adContext = point.payload;
-    // Run all AI calls in parallel for the single ad
-    const [adData, promptRecs, questionsForUser] = await Promise.all([
+    // Run only the required AI calls (no questionsForUserAI)
+    const [adData, promptRecs] = await Promise.all([
       extractAdDataWithAI(adContext, env.OPENAI_API_KEY),
       promptRecommendationsAI(adContext, env.OPENAI_API_KEY),
-      questionsForUserAI(adContext, env.OPENAI_API_KEY),
     ]);
     const advertiser = point.payload.advertiser || null;
     const advertiser_logo_url = point.payload.advertiser_logo_url || null;
@@ -69,7 +67,6 @@ export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
         images,
         summary,
         promptRecommendations: promptRecs,
-        questionsForUser,
         advertiser,
         advertiser_logo_url,
       };

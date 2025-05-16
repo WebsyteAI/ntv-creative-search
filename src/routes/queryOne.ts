@@ -1,6 +1,35 @@
-import { extractAdDataWithAI } from '../extract/extractAdDataWithAI';
 import { promptRecommendationsAI } from '../extract/promptRecommendationsAI';
 import { HonoContext } from 'hono';
+
+// Helper: Generate an engaging headline from headlines[] and user input
+async function generateEngagingHeadline(headlines: string[], userInput: string, openaiApiKey: string): Promise<string> {
+  if (!headlines || headlines.length === 0) return '';
+  const systemPrompt = `You are an expert copywriter. Given a list of possible ad headlines and a user search query, select or rewrite the most engaging, relevant headline for the user. Prefer the most compelling, clear, and relevant headline, or combine elements if needed. Return only the final headline as plain text.`;
+  const userPrompt = `User query: ${userInput}\n\nHeadlines:\n${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}\n\nBest headline:`;
+  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini-2025-04-14',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 100,
+      response_format: { type: 'text' }
+    })
+  });
+  if (!openaiResponse.ok) {
+    console.error('OpenAI headline generation error:', await openaiResponse.text());
+    return headlines[0];
+  }
+  const data = await openaiResponse.json();
+  return data.choices?.[0]?.message?.content?.trim() || headlines[0];
+}
 
 export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
   const env = c.env;
@@ -50,19 +79,20 @@ export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
     if (!point || !point.payload) {
       return c.json({ ads: [], condensedInput: input, ...qdrantData }, qdrantResponse.status);
     }
-    const adContext = point.payload;
-    // Run only the required AI calls (no questionsForUserAI)
-    const [adData, promptRecs] = await Promise.all([
-      extractAdDataWithAI(adContext, env.OPENAI_API_KEY),
-      promptRecommendationsAI(adContext, env.OPENAI_API_KEY),
-    ]);
-    const advertiser = point.payload.advertiser || null;
-    const advertiser_logo_url = point.payload.advertiser_logo_url || null;
-    const { headline, ctaUrl, images, summary } = adData;
+    const payload = point.payload;
+    // Use preview_image_urls for images, target_url for ctaUrl, and generate engaging headline
+    const images = Array.isArray(payload.preview_image_urls) ? payload.preview_image_urls : [];
+    const ctaUrl = payload.target_url || null;
+    const headlines = Array.isArray(payload.headlines) ? payload.headlines : [];
+    const engagingHeadline = await generateEngagingHeadline(headlines, input, env.OPENAI_API_KEY);
+    const promptRecs = await promptRecommendationsAI(payload, env.OPENAI_API_KEY);
+    const advertiser = payload.advertiser || null;
+    const advertiser_logo_url = payload.advertiser_logo_url || null;
+    const summary = payload.preview_text || null;
     let ad = null;
-    if (headline && ctaUrl && headline.trim() && ctaUrl.trim()) {
+    if (engagingHeadline && ctaUrl && engagingHeadline.trim() && ctaUrl.trim()) {
       ad = {
-        headline: headline.trim(),
+        headline: engagingHeadline.trim(),
         ctaUrl: ctaUrl.trim(),
         images,
         summary,

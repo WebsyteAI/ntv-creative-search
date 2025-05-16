@@ -17,6 +17,7 @@ export async function handleAdvertiserFilterEndpoint(c: HonoContext<any, any, an
       with_vector = false,
       additional_filter = [],
       collection_name = defaultCollection,
+      order_by = { key: 'created', direction: 'desc' }, // allow override, but default to created desc
     } = body;
 
     if (!advertiser_id) {
@@ -37,6 +38,7 @@ export async function handleAdvertiserFilterEndpoint(c: HonoContext<any, any, an
       filter,
       limit,
       with_vector,
+      order_by, // always include order_by
     };
 
     // Qdrant scroll endpoint

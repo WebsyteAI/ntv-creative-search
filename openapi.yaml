@@ -116,8 +116,6 @@ paths:
                                   format: date-time
                                 advertiser:
                                   type: string
-                                adContext:
-                                  type: string
                                 preview_image_urls:
                                   type: array
                                   items:
@@ -238,7 +236,99 @@ paths:
                                   format: date-time
                                 advertiser:
                                   type: string
-                                adContext:
+                                preview_image_urls:
+                                  type: array
+                                  items:
+                                    type: string
+                                    format: uri
+                                advertiser_logo_url:
+                                  type: string
+                                  format: uri
+                                target_url:
+                                  type: string
+                                  format: uri
+                              additionalProperties: true
+                  status:
+                    type: string
+                  time:
+                    type: number
+  /advertiser-filter:
+    post:
+      summary: Filter points by advertiser_id using Qdrant scroll endpoint
+      description: Returns points filtered by advertiser_id using Qdrant's /scroll endpoint. All other Qdrant scroll parameters (limit, with_payload, etc.) are supported.
+      operationId: advertiserFilter
+      requestBody:
+        description: Qdrant scroll body with advertiser_id and any other Qdrant scroll parameters (see Qdrant API docs)
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                advertiser_id:
+                  type: string
+                  description: The advertiser_id to filter by (required)
+                limit:
+                  type: integer
+                  description: Max number of points to return
+                  default: 15
+                with_payload:
+                  oneOf:
+                    - type: boolean
+                    - type: array
+                      items:
+                        type: string
+                  description: Whether to include payload in the response, or which payload fields to include
+                  default: true
+                with_vector:
+                  type: boolean
+                  description: Whether to include vector in the response
+                  default: false
+                additional_filter:
+                  type: array
+                  description: Additional Qdrant filter clauses to add to the must array
+                  items:
+                    type: object
+                collection_name:
+                  type: string
+                  description: Qdrant collection name (default: content_requests)
+      responses:
+        '200':
+          description: Qdrant scroll response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      points:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              oneOf:
+                                - type: integer
+                                - type: string
+                            version:
+                              type: integer
+                            score:
+                              type: number
+                            payload:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                type:
+                                  type: string
+                                created:
+                                  type: string
+                                  format: date-time
+                                advertiser:
                                   type: string
                                 preview_image_urls:
                                   type: array

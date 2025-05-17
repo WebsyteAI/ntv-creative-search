@@ -90,10 +90,10 @@ export async function handleQueryOneEndpoint(c: HonoContext<any, any, any>) {
     const advertiser_logo_url = payload.advertiser_logo_url || null;
     const summary = payload.preview_text || null;
     let ad = null;
-    if (engagingHeadline && ctaUrl && engagingHeadline.trim() && ctaUrl.trim()) {
+    if (engagingHeadline && engagingHeadline.trim()) {
       ad = {
         headline: engagingHeadline.trim(),
-        ctaUrl: ctaUrl.trim(),
+        ctaUrl: ctaUrl ? ctaUrl.trim() : null,
         images,
         summary,
         promptRecommendations: promptRecs,

@@ -7,6 +7,7 @@ import { handleButtonEndpoint } from './routes/button';
 import { handleRawEndpoint } from './routes/raw';
 import { handleApiQueryEndpoint } from './routes/apiQuery';
 import { handleAdvertiserFilterEndpoint } from './routes/advertiserFilter';
+import { handleAudioEndpoint } from './routes/audio';
 import { handleHealthCheck } from './routes/health';
 
 interface Env {
@@ -25,5 +26,6 @@ app.post('/button', handleButtonEndpoint);
 app.post('/raw', handleRawEndpoint);
 app.post('/api/query', handleApiQueryEndpoint);
 app.post('/advertiser-filter', handleAdvertiserFilterEndpoint);
+app.post('/audio', handleAudioEndpoint);
 
 export default app;
